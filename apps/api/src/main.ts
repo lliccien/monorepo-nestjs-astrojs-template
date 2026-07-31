@@ -28,4 +28,4 @@ async function bootstrap() {
   logger.log(`API running on: http://localhost:${port}`);
   logger.log(`Swagger documentation: http://localhost:${port}/api/docs`);
 }
-bootstrap();
+void bootstrap();
