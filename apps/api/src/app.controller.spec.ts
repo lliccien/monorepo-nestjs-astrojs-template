@@ -9,47 +9,60 @@ import {
 
 describe('AppController', () => {
   let appController: AppController;
-  let healthCheckService: HealthCheckService;
-  let db: TypeOrmHealthIndicator;
+  const checkMock = jest
+    .fn()
+    .mockImplementation(
+      async (indicators: Array<() => Promise<unknown>> = []) => {
+        await Promise.all(indicators.map((indicator) => indicator()));
+        return { status: 'ok', info: { database: { status: 'up' } } };
+      },
+    );
+  const pingCheckMock = jest
+    .fn()
+    .mockResolvedValue({ database: { status: 'up' } });
 
   beforeEach(async () => {
+    checkMock.mockClear();
+    pingCheckMock.mockClear();
+
     const app: TestingModule = await Test.createTestingModule({
       controllers: [AppController],
       providers: [
         {
           provide: HealthCheckService,
           useValue: {
-            check: jest.fn().mockResolvedValue({
-              status: 'ok',
-              info: { database: { status: 'up' } },
-            }),
+            check: checkMock,
           },
         },
         {
           provide: TypeOrmHealthIndicator,
           useValue: {
-            pingCheck: jest.fn().mockResolvedValue({ database: { status: 'up' } }),
+            pingCheck: pingCheckMock,
           },
         },
         {
           provide: MemoryHealthIndicator,
           useValue: {
-            checkHeap: jest.fn().mockResolvedValue({ memory_heap: { status: 'up' } }),
-            checkRSS: jest.fn().mockResolvedValue({ memory_rss: { status: 'up' } }),
+            checkHeap: jest
+              .fn()
+              .mockResolvedValue({ memory_heap: { status: 'up' } }),
+            checkRSS: jest
+              .fn()
+              .mockResolvedValue({ memory_rss: { status: 'up' } }),
           },
         },
         {
           provide: DiskHealthIndicator,
           useValue: {
-            checkStorage: jest.fn().mockResolvedValue({ disk: { status: 'up' } }),
+            checkStorage: jest
+              .fn()
+              .mockResolvedValue({ disk: { status: 'up' } }),
           },
         },
       ],
     }).compile();
 
     appController = app.get<AppController>(AppController);
-    healthCheckService = app.get<HealthCheckService>(HealthCheckService);
-    db = app.get<TypeOrmHealthIndicator>(TypeOrmHealthIndicator);
   });
 
   describe('root', () => {
@@ -62,7 +75,7 @@ describe('AppController', () => {
     it('should return health status', async () => {
       const result = await appController.check();
       expect(result).toHaveProperty('status', 'ok');
-      expect(healthCheckService.check).toHaveBeenCalled();
+      expect(checkMock).toHaveBeenCalled();
     });
   });
 
@@ -70,14 +83,14 @@ describe('AppController', () => {
     it('should return ok for liveness probe', async () => {
       const result = await appController.liveness();
       expect(result).toBeDefined();
-      expect(healthCheckService.check).toHaveBeenCalledWith([]);
+      expect(checkMock).toHaveBeenCalledWith([]);
     });
   });
 
   describe('readiness', () => {
     it('should check database for readiness probe', async () => {
       await appController.readiness();
-      expect(db.pingCheck).toHaveBeenCalledWith('database');
+      expect(pingCheckMock).toHaveBeenCalledWith('database');
     });
   });
 });
